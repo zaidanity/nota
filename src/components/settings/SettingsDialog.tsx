@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Brand } from '@/components/Brand'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
@@ -20,7 +19,7 @@ interface SettingsDialogProps {
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const theme = useTheme('system')
   const settings = useAppSettings()
-  const [activeTab, setActiveTab] = useState('ai')
+  const [activeTab, setActiveTab] = useState('display')
   const [saveStatus, setSaveStatus] = useState<Record<AIProviderId, 'idle' | 'saving' | 'success' | 'error'>>({
     openai: 'idle',
     anthropic: 'idle',
@@ -61,30 +60,16 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Brand compact />
-          </DialogTitle>
-          <DialogDescription>Pengaturan aplikasi Nota</DialogDescription>
+          <DialogTitle>Pengaturan</DialogTitle>
+          <DialogDescription>Preferences aplikasi Nota</DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="ai">AI Assistant</TabsTrigger>
             <TabsTrigger value="display">Tampilan</TabsTrigger>
             <TabsTrigger value="behavior">Perilaku</TabsTrigger>
+            <TabsTrigger value="ai">AI</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="ai" className="space-y-4 mt-4">
-            {AI_PROVIDER_IDS.map((provider) => (
-              <ProviderKeySection
-                key={provider}
-                provider={provider}
-                saveStatus={saveStatus[provider]}
-                onSave={(key) => handleSaveKey(provider, key)}
-                onRemove={() => handleRemoveKey(provider)}
-              />
-            ))}
-          </TabsContent>
 
           <TabsContent value="display" className="space-y-4 mt-4">
             <div className="space-y-2">
@@ -155,6 +140,22 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </SelectContent>
               </Select>
             </div>
+          </TabsContent>
+
+          <TabsContent value="ai" className="space-y-3 mt-4">
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              Hubungkan API key milikmu sendiri. Key disimpan terenkripsi di perangkat dan
+              hanya dipakai saat kamu meminta bantuan AI.
+            </p>
+            {AI_PROVIDER_IDS.map((provider) => (
+              <ProviderKeySection
+                key={provider}
+                provider={provider}
+                saveStatus={saveStatus[provider]}
+                onSave={(key) => handleSaveKey(provider, key)}
+                onRemove={() => handleRemoveKey(provider)}
+              />
+            ))}
           </TabsContent>
         </Tabs>
 

@@ -1,5 +1,6 @@
 import { format, formatDistanceToNow, isToday, isYesterday, subDays } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
+import { Capacitor } from '@capacitor/core'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import type { NoteRecord, SortMode } from '@/db/schema'
@@ -186,6 +187,30 @@ export function downloadBlob(blob: Blob, filename: string): void {
   anchor.click()
   anchor.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
+}
+
+// WebView Android tidak bisa unduh blob: → simpan ke cache lalu bagikan ke app lain.
+export async function saveBlob(blob: Blob, filename: string): Promise<void> {
+  if (!Capacitor.isNativePlatform()) {
+    downloadBlob(blob, filename)
+    return
+  }
+  const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+    import('@capacitor/filesystem'),
+    import('@capacitor/share'),
+  ])
+  const data = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+  const { uri } = await Filesystem.writeFile({
+    path: filename,
+    data,
+    directory: Directory.Cache,
+  })
+  await Share.share({ title: filename, url: uri, dialogTitle: 'Simpan PDF' })
 }
 
 export function readFileAsText(file: File): Promise<string> {

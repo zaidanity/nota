@@ -10,7 +10,7 @@ function applyTheme(theme: ThemeMode): void {
   } catch {
     // Theme still applies for this session.
   }
-  const color = dark ? '#151513' : '#f7f6f2'
+  const color = dark ? '#0e0f12' : '#fbf6f0'
   document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((meta) => {
     meta.content = color
   })

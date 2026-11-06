@@ -2,11 +2,12 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, createNote, getNoteByUuid, updateNote, emptyTrash, togglePin, setArchived, setTrashed, deleteNotePermanently } from '@/db/db'
 import { useTheme } from '@/hooks/useTheme'
-import { Sidebar } from '@/components/layout/Sidebar'
+import { Rail } from '@/components/layout/Rail'
 import { NotesPanel } from '@/components/notes/NotesPanel'
 import { EditorShell } from '@/components/editor/EditorShell'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { AIActionDialog } from '@/components/ai/AIActionDialog'
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { ChevronLeft, Menu } from 'lucide-react'
 import type { NoteRecord, SortMode } from '@/db/schema'
 import type { ViewFilter } from '@/lib/views'
@@ -20,9 +21,7 @@ function App() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortMode>('updated-desc')
   const [selectedNoteUuid, setSelectedNoteUuid] = useState<string | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() =>
-    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
-  )
+  const [navOpen, setNavOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
   const [aiSelection, setAiSelection] = useState<{ from: number; to: number; text: string } | null>(null)
@@ -46,15 +45,25 @@ function App() {
     return filtered
   }, [allNotes, view, search])
 
-  const aiConfigured = useMemo(() => {
-    return true
-  }, [])
-
-  const closeSidebarOnMobile = useCallback(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-      setSidebarOpen(false)
+  const counts = useMemo(() => {
+    let all = 0
+    let pinned = 0
+    let archived = 0
+    let trash = 0
+    for (const note of allNotes) {
+      if (note.isTrashed) {
+        trash += 1
+        continue
+      }
+      if (note.isArchived) {
+        archived += 1
+        continue
+      }
+      all += 1
+      if (note.isPinned) pinned += 1
     }
-  }, [])
+    return { all, pinned, archived, trash }
+  }, [allNotes])
 
   useEffect(() => {
     if (selectedNoteUuid) {
@@ -70,8 +79,8 @@ function App() {
     const note = await createNote()
     setSelectedNoteUuid(note.uuid)
     setSearch('')
-    closeSidebarOnMobile()
-  }, [closeSidebarOnMobile])
+    setNavOpen(false)
+  }, [])
 
   const handleUpdateNote = useCallback(
     async (content: string, plainText: string, tags: string[]) => {
@@ -83,14 +92,13 @@ function App() {
 
   const handleSelectNote = useCallback((uuid: string) => {
     setSelectedNoteUuid(uuid)
-    closeSidebarOnMobile()
-  }, [closeSidebarOnMobile])
+  }, [])
 
   const handleSelectView = useCallback((nextView: ViewFilter) => {
     setView(nextView)
     setSearch('')
-    closeSidebarOnMobile()
-  }, [closeSidebarOnMobile])
+    setNavOpen(false)
+  }, [])
 
   const handleEmptyTrash = useCallback(async () => {
     await emptyTrash()
@@ -101,14 +109,14 @@ function App() {
   }, [])
 
   const handleToggleArchive = useCallback(async (uuid: string) => {
-    const note = allNotes.find(n => n.uuid === uuid)
+    const note = allNotes.find((n) => n.uuid === uuid)
     if (note) {
       await setArchived(uuid, !note.isArchived)
     }
   }, [allNotes])
 
   const handleToggleTrash = useCallback(async (uuid: string) => {
-    const note = allNotes.find(n => n.uuid === uuid)
+    const note = allNotes.find((n) => n.uuid === uuid)
     if (note) {
       await setTrashed(uuid, !note.isTrashed)
       if (!note.isTrashed) {
@@ -133,9 +141,6 @@ function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         setAiDialogOpen(true)
-      }
-      if (e.key === 'Escape') {
-        setSidebarOpen(false)
       }
     },
     [handleCreateNote]
@@ -164,47 +169,40 @@ function App() {
     }
   }, [])
 
+  const rail = (
+    <Rail
+      view={view}
+      counts={counts}
+      onSelectView={handleSelectView}
+      onOpenSettings={() => {
+        setSettingsOpen(true)
+        setNavOpen(false)
+      }}
+      onNavigate={() => setNavOpen(false)}
+    />
+  )
+
   return (
     <div className="flex h-full min-h-0 bg-background">
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <div className="hidden lg:block">{rail}</div>
 
-      <aside
-        className={[
-          'fixed inset-y-0 left-0 z-50 shrink-0 overflow-hidden bg-sidebar transition-all duration-200 ease-out',
-          'lg:static lg:z-auto',
-          sidebarOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:w-0',
-        ].join(' ')}
-      >
-        <div className="h-full w-64">
-          <Sidebar
-            notes={allNotes}
-            view={view}
-            onSelectView={handleSelectView}
-            onNewNote={handleCreateNote}
-            onOpenSettings={() => {
-              setSettingsOpen(true)
-              closeSidebarOnMobile()
-            }}
-            onNavigate={() => closeSidebarOnMobile()}
-            aiConfigured={aiConfigured}
-          />
-        </div>
-      </aside>
+      <Sheet open={navOpen} onOpenChange={setNavOpen}>
+        <SheetContent side="left" className="w-auto border-r border-border bg-sidebar p-0" showClose={false}>
+          <SheetTitle className="sr-only">Navigasi</SheetTitle>
+          {rail}
+        </SheetContent>
+      </Sheet>
 
-      <div
+      <section
         className={[
-          'min-h-0 w-full flex-col border-r border-border/80',
-          'lg:flex lg:w-80 lg:shrink-0 xl:w-84',
+          'min-h-0 w-full flex-col border-r border-border bg-background',
+          'lg:flex lg:w-[360px] lg:shrink-0 xl:w-[400px]',
           selectedNoteUuid ? 'hidden lg:flex' : 'flex',
         ].join(' ')}
       >
         <NotesPanel
           notes={notes}
+          allNotes={allNotes}
           view={view}
           search={search}
           onSearchChange={setSearch}
@@ -212,8 +210,9 @@ function App() {
           onSortChange={setSort}
           selectedUuid={selectedNoteUuid}
           onSelectNote={handleSelectNote}
+          onSelectTag={(tag) => handleSelectView(tag ? { type: 'tag', tag } : { type: 'all' })}
           onCreateNote={handleCreateNote}
-          onOpenSidebar={() => setSidebarOpen((open) => !open)}
+          onOpenNav={() => setNavOpen(true)}
           onEmptyTrash={handleEmptyTrash}
           isSearching={search.length > 0}
           onTogglePin={handleTogglePin}
@@ -221,9 +220,9 @@ function App() {
           onToggleTrash={handleToggleTrash}
           onDeletePermanently={handleDeletePermanently}
         />
-      </div>
+      </section>
 
-      <div
+      <main
         className={[
           'min-h-0 flex-1 flex-col',
           selectedNoteUuid ? 'flex' : 'hidden lg:flex',
@@ -234,7 +233,7 @@ function App() {
             <button
               type="button"
               onClick={() => setSelectedNoteUuid(null)}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
               aria-label="Kembali ke daftar"
             >
               <ChevronLeft className="size-5" />
@@ -242,8 +241,8 @@ function App() {
             </button>
             <button
               type="button"
-              onClick={() => setSidebarOpen(true)}
-              className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+              onClick={() => setNavOpen(true)}
+              className="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
               aria-label="Buka menu"
             >
               <Menu className="size-5" />
@@ -262,23 +261,29 @@ function App() {
             onOpenAI={() => setAiDialogOpen(true)}
           />
         ) : (
-          <div className="flex flex-1 items-center justify-center bg-surface">
-            <div className="text-center">
-              <div className="mb-4 text-4xl"></div>
-              <h2 className="text-lg font-medium text-foreground mb-2">Pilih catatan</h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                Pilih catatan dari panel kiri atau buat yang baru
+          <div className="bg-wash flex flex-1 items-center justify-center bg-background">
+            <div className="max-w-xs px-6 text-center">
+              <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-accent-soft text-accent shadow-soft">
+                <svg className="size-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.6}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 5h16M4 10h16M4 15h10M4 20h7" />
+                </svg>
+              </div>
+              <h2 className="font-display text-2xl font-semibold tracking-[-0.01em] text-foreground">
+                Ruang menulismu
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Pilih catatan dari daftar, atau mulai satu yang baru.
               </p>
               <button
                 onClick={handleCreateNote}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-md hover:bg-accent-hover transition-colors"
+                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground shadow-[0_2px_8px_-3px_rgb(232_88_43/0.6)] transition-colors hover:bg-accent-hover"
               >
-                <span>+</span> Catatan baru
+                <span className="text-base leading-none">+</span> Catatan baru
               </button>
             </div>
           </div>
         )}
-      </div>
+      </main>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <AIActionDialog
@@ -293,4 +298,3 @@ function App() {
 }
 
 export default App
-
