@@ -1,0 +1,13 @@
+﻿node_modules/
+dist/
+build/
+android/build/
+android/.gradle/
+android/app/build/
+android/local.properties
+*.iml
+.idea/
+*.log
+.env
+.venv
+npm-debug.log*
